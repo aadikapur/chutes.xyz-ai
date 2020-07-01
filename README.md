@@ -12,6 +12,7 @@ ai-v-ai-version-1
   <li>Changed small rewards to only be given when the opponent has less bases after the turn to increase aggression</li>
   <li>Changed model structure from 34(number of squares on the board + 1 for bias)->100->100(hidden layers)->546(number of outputs) to 34->9(number of pieces)->204(max number of possible moves for a piece [tank move])->546 so that the model decides what piece to move and then figures out how to move it.</li>
 </ol>
+Conclusion: The AI knows how to put down parachutes around bases but it doesn't bomb, it doesn't upgrade parachutes until all squares are taken and it doesn't move units once it upgrades to them.</br></br>
 ai-v-ai-version-2</br>
 <ol>
   <li>Built the game environment to only include tanks at start and changed the legal moves to only moving tanks so that the agents can learn how to move tanks first. Then I add everything but parachutes or the ability to put parachutes down with other moves allowed. Only base-related intermediate rewards are available and the reward to win is not.</li>
