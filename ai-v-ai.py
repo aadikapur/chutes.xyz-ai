@@ -1,8 +1,7 @@
-#!/usr/bin/python
-
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation
 from keras.optimizers import Adam
+from keras.models import load_model
 from collections import deque
 import time
 import random
@@ -16,12 +15,14 @@ class Game(object):
   def __init__(self, p1, p2):
     self.p1turn=True
     self.squares = [0]*NUMBER_OF_CELLS #0 nothing 1 redPara 2 bluePara 3 redSoldier 4 blueSoldier 5 redTank 6 blueTank 7 redTrench 8 blueTrench 9 redSpy 10 blueSpy
-    redsquares = [0, 1, 2, 30, 31, 32]
-    bluesquares = [3, 9, 13, 19, 23, 29]
-    for redSquare in redsquares:
-      self.squares[redSquare] = 1
-    for blueSquare in bluesquares:
-      self.squares[blueSquare] = 2
+    #redsquares = [0, 1, 2, 30, 31, 32]
+    #bluesquares = [3, 9, 13, 19, 23, 29]
+    #for redSquare in redsquares:
+    #  self.squares[redSquare] = 1
+    #for blueSquare in bluesquares:
+    #  self.squares[blueSquare] = 2
+    for i in range(len(self.squares)):
+        self.squares[i] = random.randint(0,10)
     self.p1 = p1
     self.p2 = p2
     self.p1bases = 0
@@ -320,9 +321,9 @@ class DQNAgent:
   def create_model(self):
     #make model
     model = Sequential()
-    model.add(Dense(21, activation='relu', input_dim=NUMBER_OF_CELLS))
-    model.add(Dense(200, activation='relu'))
-    model.add(Dense(300, activation='relu'))
+    model.add(Dense(33, activation='relu', input_dim=NUMBER_OF_CELLS))
+    model.add(Dense(10, activation='relu'))
+    model.add(Dense(205, activation='relu'))
     model.add(Dense(546, activation='softmax'))
     model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
     return model
@@ -379,15 +380,17 @@ class DQNAgent:
     return self.model.predict(np.array([state])/BOARD_RANGE)[0]
 
  
-EPISODES = 20_000
+EPISODES = 10_000
 AGGREGATE_STATS_EVERY = 50  # episodes
 # Exploration settings
-epsilon = 1  # not a constant, going to be decayed
+epsilon1 = 1  # not a constant, going to be decayed
+epsilon2 = 1  # not a constant, going to be decayed
 EPSILON_DECAY = 0.9998
-MIN_EPSILON = 0.001
  
 agent1 = DQNAgent()
 agent2 = DQNAgent()
+agent1.model = load_model('./models/p1trained.model')
+agent2.model = load_model('./models/p2trained.model')
 ep_rewards1 = []
 ep_rewards2 = []
 draws = 0
@@ -468,50 +471,52 @@ def move(game, agent, agentnum, epsilon):
   other_bases = game.p2bases if agentnum==1 else game.p1bases
   legalMoves = game.getLegalMoves(1 if game.p1turn else 2)
 
+  moveLow = 33
+  moveHigh = 546
   #Making a move
   if np.random.random() > epsilon:
     # Get action from Q table
     #print('model')
     actions = np.argsort(agent.get_qs(current_state))[::-1]
     for action in actions:
-      if tryMovesUntilOneWorksThenMove(game,action):
+      if moveLow<=action<moveHigh and tryMovesUntilOneWorksThenMove(game,action):
         break
   else:
     #Random
     #print('random')
-    randLow=0
-    randHigh=545
     while 1==1:
-      action = np.random.randint(randLow, randHigh)
+      action = np.random.randint(moveLow, moveHigh)
       #print(action, end=" ")
       if tryMovesUntilOneWorksThenMove(game,action):
         break
 
   #After Move
-  #game.printBoard()
+  game.printBoard()
   new_state = game.squares
+  legalMoves = game.getLegalMoves(1 if game.p1turn else 2)
+  winner = game.whoWon()
+  print(legalMoves)
   new_bases = game.p1bases if agentnum==1 else game.p2bases
   new_other_bases = game.p2bases if agentnum==1 else game.p1bases
   #check if draw
-  legalMoves = game.getLegalMoves(1 if game.p1turn else 2)
   numPossibleMoves = 0
-  for typeOfMove in legalMoves:
+  for typeOfMove in legalMoves[1:]:
     numPossibleMoves += len(typeOfMove)
-  winner = game.whoWon()
   reward = 0
   if winner is None:
     if numPossibleMoves==0:
       done=True
-    elif new_bases<current_bases:
-      reward = -0.1
-    elif new_bases>current_bases:
+    elif new_other_bases<other_bases:
       reward = 0.1
+    elif new_bases>current_bases:
+      reward = 0.03
   elif winner==agentnum:
     done=True
-    reward = 1
+    reward = 0
   elif winner and winner != agentnum:
     done=True
   # Every step we update replay memory and train main network
+  print(reward)
   agent.update_replay_memory((current_state, action, reward, new_state, done))
   agent.train(done)
   return done
@@ -529,10 +534,10 @@ for episode in range(EPISODES):
     # Reset flag and start iterating until episode ends
     done = False
     while not done:
-      done = move(game,agent1,1,epsilon)
+      done = move(game,agent1,1,epsilon1)
       if done:
         break
-      done = move(game,agent2,2,epsilon)
+      done = move(game,agent2,2,epsilon2)
       step +=2
     winner = game.whoWon()
     if winner is None:
@@ -543,16 +548,21 @@ for episode in range(EPISODES):
       episode_reward=(0,1)
     
     # Decay epsilon for p1
-    if epsilon > MIN_EPSILON:
-      epsilon *= EPSILON_DECAY
-      epsilon = max(MIN_EPSILON, epsilon)
+    epsilon1 *= EPSILON_DECAY
+    epsilon2 *= EPSILON_DECAY
     
+    #save model1
+    ep_rewards1.append(episode_reward[0])
     #save model2
     ep_rewards2.append(episode_reward[1])
+    
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
-        win_percent = sum(ep_rewards2[-AGGREGATE_STATS_EVERY:])/len(ep_rewards2[-AGGREGATE_STATS_EVERY:])
+        win_percent1 = sum(ep_rewards1[-AGGREGATE_STATS_EVERY:])/len(ep_rewards1[-AGGREGATE_STATS_EVERY:])
         # Save model, but only when min reward is greater or equal a set value
-        agent2.model.save('./models/{}__p2__win_percent{}__gamenum{}.model'.format(MODEL_NAME, win_percent,draws+p1wins+p2wins))
+        agent1.model.save('./models/{}_p1_wp{}_g{}_e{}.model'.format(MODEL_NAME, win_percent1,draws+p1wins+p2wins,epsilon1))
+        win_percent2 = sum(ep_rewards2[-AGGREGATE_STATS_EVERY:])/len(ep_rewards2[-AGGREGATE_STATS_EVERY:])
+        # Save model, but only when min reward is greater or equal a set value
+        agent2.model.save('./models/{}_p2_wp{}_g{}_e{}.model'.format(MODEL_NAME, win_percent2,draws+p1wins+p2wins,epsilon2))
     
     #print
     if episode_reward == (0,0):
@@ -565,6 +575,7 @@ for episode in range(EPISODES):
     p1winsY.append(p1wins)
     p2winsY.append(p2wins)
     numTurnsInGameY.append(step)
+    print('draws: {}, p1wins: {}, p2wins: {}'.format(draws,p1wins,p2wins))
 
 plt.plot(np.arange(EPISODES),drawY)
 plt.savefig('draws.png')
