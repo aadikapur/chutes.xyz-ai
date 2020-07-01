@@ -1,6 +1,6 @@
 ## AI for chutes.xyz
 AI for chutes.xyz using a deep q-learning model.</br></br>
-Trains on AWS SageMaker, convertModel converts keras model to tf_js model and the static file on the model is uploaded to and read by the server for chutes.xyz.
+Trains on AWS SageMaker, convertModel converts keras model to tf_js model and the static directory is uploaded to and read by the server for chutes.xyz.
 
 ### Updates
 ai-v-ai-version-1
