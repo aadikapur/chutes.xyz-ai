@@ -15,5 +15,5 @@ ai-v-ai-version-1
 Conclusion: The AI knows how to put down parachutes around bases but it doesn't bomb, it doesn't upgrade parachutes until all squares are taken and it doesn't move units once it upgrades to them.</br></br>
 ai-v-ai-version-2</br>
 <ol>
-  <li>Built the game environment to only include tanks at start and changed the legal moves to only moving tanks so that the agents can learn how to move tanks first. Then I add everything but parachutes or the ability to put parachutes down with other moves allowed. Only base-related intermediate rewards are available and the reward to win is not.</li>
+  <li>First the agents are trained only with base-related small rewards with a randomly generated map with only tanks. These agents are saved and loaded again and again into a map with only soldiers and spies, then a map with everything but parachutes, and finally the original game map. There are no rewards for winning until the original game environment.</li>
 </ol>
