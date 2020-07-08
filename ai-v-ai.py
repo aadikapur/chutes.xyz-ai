@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation
 from keras.optimizers import Adam
@@ -15,14 +17,12 @@ class Game(object):
   def __init__(self, p1, p2):
     self.p1turn=True
     self.squares = [0]*NUMBER_OF_CELLS #0 nothing 1 redPara 2 bluePara 3 redSoldier 4 blueSoldier 5 redTank 6 blueTank 7 redTrench 8 blueTrench 9 redSpy 10 blueSpy
-    #redsquares = [0, 1, 2, 30, 31, 32]
-    #bluesquares = [3, 9, 13, 19, 23, 29]
-    #for redSquare in redsquares:
-    #  self.squares[redSquare] = 1
-    #for blueSquare in bluesquares:
-    #  self.squares[blueSquare] = 2
-    for i in range(len(self.squares)):
-        self.squares[i] = random.randint(0,10)
+    redsquares = [0, 1, 2, 30, 31, 32]
+    bluesquares = [3, 9, 13, 19, 23, 29]
+    for redSquare in redsquares:
+      self.squares[redSquare] = 1
+    for blueSquare in bluesquares:
+      self.squares[blueSquare] = 2
     self.p1 = p1
     self.p2 = p2
     self.p1bases = 0
@@ -317,6 +317,8 @@ class DQNAgent:
     self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
     # Used to count when to update target network with main network's weights
     self.target_update_counter = 0
+    self.movesworked=0
+    self.movesdidntwork=0
  
   def create_model(self):
     #make model
@@ -389,14 +391,17 @@ EPSILON_DECAY = 0.9998
  
 agent1 = DQNAgent()
 agent2 = DQNAgent()
-agent1.model = load_model('./models/p1trained.model')
-agent2.model = load_model('./models/p2trained.model')
+agent1.model = load_model('./models/p1_trained_intermediate.model')
+agent2.model = load_model('./models/p2_trained_intermediate.model')
 ep_rewards1 = []
 ep_rewards2 = []
 draws = 0
 p1wins = 0
 p2wins = 0
 typeOfUnit = [0]*9
+rewardType=[0]*4
+typeOfUnitY = [[] for i in range(9)]
+rewardTypeY = [[] for i in range(4)]
 numTurnsInGameY = []
 drawY = []
 p1winsY = []
@@ -464,15 +469,16 @@ def tryMovesUntilOneWorksThenMove(game,action):
 
 def move(game, agent, agentnum, epsilon):
   #Before Move
-  global legalMoves
+  global legalMoves, rewardType
   done = False
   current_state = game.squares
   current_bases = game.p1bases if agentnum==1 else game.p2bases
   other_bases = game.p2bases if agentnum==1 else game.p1bases
   legalMoves = game.getLegalMoves(1 if game.p1turn else 2)
 
-  moveLow = 33
+  moveLow = 0
   moveHigh = 546
+  movereward=0
   #Making a move
   if np.random.random() > epsilon:
     # Get action from Q table
@@ -480,7 +486,19 @@ def move(game, agent, agentnum, epsilon):
     actions = np.argsort(agent.get_qs(current_state))[::-1]
     for action in actions:
       if moveLow<=action<moveHigh and tryMovesUntilOneWorksThenMove(game,action):
+        #move worked for soldier move
+        if 98<action<171:
+            agent.movesworked+=1
+            movereward+=0.1
+        elif 203<action<408:
+            agent.movesworked+=3
+            movereward+=0.1
+        elif 473<action<546:
+            agent.movesworked+=1
+            movereward+=0.1
         break
+      if 98<action<171 or 203<action<408 or 473<action<546:
+        agent.movesdidntwork+=1
   else:
     #Random
     #print('random')
@@ -491,32 +509,74 @@ def move(game, agent, agentnum, epsilon):
         break
 
   #After Move
-  game.printBoard()
+  #game.printBoard()
   new_state = game.squares
-  legalMoves = game.getLegalMoves(1 if game.p1turn else 2)
   winner = game.whoWon()
-  print(legalMoves)
-  new_bases = game.p1bases if agentnum==1 else game.p2bases
-  new_other_bases = game.p2bases if agentnum==1 else game.p1bases
+  
+  #calculate number of base people killed
+  indices=list(range(33))
+  for i in [4,6,8,14,16,18,24,26,28]:
+    indices.remove(i)
+  oldOdds=0
+  oldEvens=0
+  newOdds=0
+  newEvens=0
+  for i in indices:
+    num=0
+    if current_state[i] in [1,2]:
+      num=1
+    elif current_state[i] in [3,4,7,8]:
+      num=2
+    elif current_state[i] in [5,6,9,10]:
+      num=3
+    if current_state[i]%2==1:
+      oldOdds+=num
+    elif current_state[i]!=0:
+      oldEvens+=num
+    
+    num=0
+    if new_state[i] in [1,2]:
+      num=1
+    elif new_state[i] in [3,4,7,8]:
+      num=2
+    elif new_state[i] in [5,6,9,10]:
+      num=3
+    if new_state[i]%2==1:
+      newOdds+=num
+    elif new_state[i]!=0:
+      newEvens+=num
+    
+  if agentnum==1:
+    legalMoves=game.getLegalMoves(2)
+    new_bases=game.p1bases
+    new_other_bases=game.p2bases
+    base_people_killed=(newOdds-oldOdds)+(oldEvens-newEvens)
+  else:
+    legalMoves=game.getLegalMoves(1)
+    new_bases=game.p2bases
+    new_other_bases=game.p1bases
+    base_people_killed=(newEvens-oldEvens)+(oldOdds-newOdds)
   #check if draw
   numPossibleMoves = 0
-  for typeOfMove in legalMoves[1:]:
+  for typeOfMove in legalMoves:
     numPossibleMoves += len(typeOfMove)
   reward = 0
   if winner is None:
     if numPossibleMoves==0:
       done=True
-    elif new_other_bases<other_bases:
-      reward = 0.1
-    elif new_bases>current_bases:
-      reward = 0.03
-  elif winner==agentnum:
+    #assign reward
+    if agent.movesdidntwork==0:
+        reward=0
+    else:
+        reward=agent.movesworked/(agent.movesworked+agent.movesdidntwork)
+    reward+=base_people_killed/20
+    reward+=movereward
+  elif winner and winner == agentnum:
     done=True
-    reward = 0
   elif winner and winner != agentnum:
     done=True
   # Every step we update replay memory and train main network
-  print(reward)
+  #print(reward)
   agent.update_replay_memory((current_state, action, reward, new_state, done))
   agent.train(done)
   return done
@@ -557,12 +617,16 @@ for episode in range(EPISODES):
     ep_rewards2.append(episode_reward[1])
     
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
-        win_percent1 = sum(ep_rewards1[-AGGREGATE_STATS_EVERY:])/len(ep_rewards1[-AGGREGATE_STATS_EVERY:])
+        win_percent1 = sum(ep_rewards1[-AGGREGATE_STATS_EVERY:])/AGGREGATE_STATS_EVERY
         # Save model, but only when min reward is greater or equal a set value
-        agent1.model.save('./models/{}_p1_wp{}_g{}_e{}.model'.format(MODEL_NAME, win_percent1,draws+p1wins+p2wins,epsilon1))
-        win_percent2 = sum(ep_rewards2[-AGGREGATE_STATS_EVERY:])/len(ep_rewards2[-AGGREGATE_STATS_EVERY:])
+        agent1.model.save('./models/{}_p1_moves{}__g{}_e{}.model'.format(MODEL_NAME,(agent1.movesworked/(agent1.movesworked+agent1.movesdidntwork) if agent1.movesdidntwork!=0 else 0), draws+p1wins+p2wins,epsilon1))
+        win_percent2 = sum(ep_rewards2[-AGGREGATE_STATS_EVERY:])/AGGREGATE_STATS_EVERY
         # Save model, but only when min reward is greater or equal a set value
-        agent2.model.save('./models/{}_p2_wp{}_g{}_e{}.model'.format(MODEL_NAME, win_percent2,draws+p1wins+p2wins,epsilon2))
+        agent2.model.save('./models/{}_p2_moves{}_g{}_e{}.model'.format(MODEL_NAME,(agent2.movesworked/(agent2.movesworked+agent2.movesdidntwork) if agent2.movesdidntwork!=0 else 0), draws+p1wins+p2wins,epsilon2))
+        if win_percent1<0.1:
+            epsilon1/=0.99
+        elif win_percent2<0.1:
+            epsilon2/=0.99
     
     #print
     if episode_reward == (0,0):
@@ -575,13 +639,7 @@ for episode in range(EPISODES):
     p1winsY.append(p1wins)
     p2winsY.append(p2wins)
     numTurnsInGameY.append(step)
-    print('draws: {}, p1wins: {}, p2wins: {}'.format(draws,p1wins,p2wins))
-
-plt.plot(np.arange(EPISODES),drawY)
-plt.savefig('draws.png')
-plt.plot(np.arange(EPISODES),p1winsY)
-plt.savefig('p1wins.png')
-plt.plot(np.arange(EPISODES),p2winsY)
-plt.savefig('p2wins.png')
-plt.plot(np.arange(EPISODES),numTurnsInGameY)
-plt.savefig('gameTurns.png')
+    for num in range(len(typeOfUnit)):
+        typeOfUnitY[num].append(typeOfUnit[num])
+    for num in range(len(rewardType)):
+        rewardTypeY[num].append(rewardType[num])
