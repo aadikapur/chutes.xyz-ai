@@ -382,7 +382,7 @@ class DQNAgent:
     return self.model.predict(np.array([state])/BOARD_RANGE)[0]
 
  
-EPISODES = 10_000
+EPISODES = 30_000
 AGGREGATE_STATS_EVERY = 50  # episodes
 # Exploration settings
 epsilon1 = 1  # not a constant, going to be decayed
@@ -391,8 +391,6 @@ EPSILON_DECAY = 0.9998
  
 agent1 = DQNAgent()
 agent2 = DQNAgent()
-agent1.model = load_model('./models/p1_trained_intermediate.model')
-agent2.model = load_model('./models/p2_trained_intermediate.model')
 ep_rewards1 = []
 ep_rewards2 = []
 draws = 0
@@ -489,13 +487,13 @@ def move(game, agent, agentnum, epsilon):
         #move worked for soldier move
         if 98<action<171:
             agent.movesworked+=1
-            movereward+=0.1
+            movereward+=0.3
         elif 203<action<408:
             agent.movesworked+=3
-            movereward+=0.1
+            movereward+=0.3
         elif 473<action<546:
             agent.movesworked+=1
-            movereward+=0.1
+            movereward+=0.3
         break
       if 98<action<171 or 203<action<408 or 473<action<546:
         agent.movesdidntwork+=1
@@ -506,6 +504,12 @@ def move(game, agent, agentnum, epsilon):
       action = np.random.randint(moveLow, moveHigh)
       #print(action, end=" ")
       if tryMovesUntilOneWorksThenMove(game,action):
+        if 98<action<171:
+            movereward+=0.3
+        elif 203<action<408:
+            movereward+=0.3
+        elif 473<action<546:
+            movereward+=0.3
         break
 
   #After Move
@@ -513,49 +517,14 @@ def move(game, agent, agentnum, epsilon):
   new_state = game.squares
   winner = game.whoWon()
   
-  #calculate number of base people killed
-  indices=list(range(33))
-  for i in [4,6,8,14,16,18,24,26,28]:
-    indices.remove(i)
-  oldOdds=0
-  oldEvens=0
-  newOdds=0
-  newEvens=0
-  for i in indices:
-    num=0
-    if current_state[i] in [1,2]:
-      num=1
-    elif current_state[i] in [3,4,7,8]:
-      num=2
-    elif current_state[i] in [5,6,9,10]:
-      num=3
-    if current_state[i]%2==1:
-      oldOdds+=num
-    elif current_state[i]!=0:
-      oldEvens+=num
-    
-    num=0
-    if new_state[i] in [1,2]:
-      num=1
-    elif new_state[i] in [3,4,7,8]:
-      num=2
-    elif new_state[i] in [5,6,9,10]:
-      num=3
-    if new_state[i]%2==1:
-      newOdds+=num
-    elif new_state[i]!=0:
-      newEvens+=num
-    
   if agentnum==1:
     legalMoves=game.getLegalMoves(2)
     new_bases=game.p1bases
     new_other_bases=game.p2bases
-    base_people_killed=(newOdds-oldOdds)+(oldEvens-newEvens)
   else:
     legalMoves=game.getLegalMoves(1)
     new_bases=game.p2bases
     new_other_bases=game.p1bases
-    base_people_killed=(newEvens-oldEvens)+(oldOdds-newOdds)
   #check if draw
   numPossibleMoves = 0
   for typeOfMove in legalMoves:
@@ -569,9 +538,13 @@ def move(game, agent, agentnum, epsilon):
         reward=0
     else:
         reward=agent.movesworked/(agent.movesworked+agent.movesdidntwork)
-    reward+=base_people_killed/20
+    if new_other_bases<other_bases:
+        reward+=0.1
+    if new_bases>current_bases:
+        reward+=0.03
     reward+=movereward
   elif winner and winner == agentnum:
+    reward=1
     done=True
   elif winner and winner != agentnum:
     done=True
