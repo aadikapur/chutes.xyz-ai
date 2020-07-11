@@ -17,3 +17,8 @@ ai-v-ai-version-2</br>
 <ol>
   <li>First the agents are trained only with base-related intermediate rewards in a randomly generated map with only tanks. These agents are saved and loaded again and again into a map with only soldiers and spies, then a map with everything but parachutes, and finally the original game map. There are no rewards for winning until the original game environment.</li>
 </ol>
+ai-v-ai-version-3</br>
+<ol>
+  <li>New agents were trained with only intermediate rewards: lowering opponent's bases, winning bases, moving complex pieces and a ratio of moves predicted that were legal moves to those that were not. The last reward though I thought would encourage the model to fit around legality but instead the AI trained to just play the same move over and over again to maximize the ratio for this single reward and did not consider the other rewards.
+  </li>
+</ol>
