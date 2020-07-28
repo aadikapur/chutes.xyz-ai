@@ -22,6 +22,8 @@ version 2</br>
 Conclusion: This version still didn't encourage the AI to move more. I will need to artificially reward the AI to move pieces to balance out the negative rewards associated with them in the beginning due to bad moves. Both environment changes and rewards based on accuracy were not able to make the AI's move-piece moves any better.</br></br>
 version 3</br>
 <ol>
-  <li>New agents were trained with only intermediate rewards: lowering opponent's bases, winning bases and moving complex pieces (at 0.3 for tanks because they have around triple the number of possible moves compared to soldiers and spies).
+  <li>New agents were trained with only intermediate rewards: lowering opponent's bases, winning bases and moving complex pieces (at 0.3 for tanks because they have around triple the number of possible moves compared to soldiers and spies). The latter was done by imposing a tax for standing advanced pieces.
   </li>
+  <li>Bombing is now done algorithmically before the moves from the neural network are fed. If a bombing opportunity is available, a bomb is set on that square.</li>
+  <li>After the new agents are trained, they are trained with both p1 and p2 adopting p2's model but p1 playing without any random exploratory moves while p2 starts at epsilon=1. Through this, I aim to fix p2's strategy's weaknesses as it plays against itself as p1.</li>
 </ol>
