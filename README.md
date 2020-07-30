@@ -27,3 +27,4 @@ version 3</br>
   <li>Bombing is now done algorithmically before the moves from the neural network are fed. If a bombing opportunity is available, a bomb is set on that square.</li>
   <li>After the new agents are trained, they are trained with both p1 and p2 adopting p2's model but p1 playing without any random exploratory moves while p2 starts at epsilon=1. Through this, I aim to fix p2's strategy's weaknesses as it plays against itself as p1.</li>
 </ol>
+Conclusion: This version is playable. Soldiers are often used improperly and spies are never used but parachutes and tanks are played well.
